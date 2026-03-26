@@ -67,7 +67,7 @@ DNS="${DNS:-1.1.1.1,8.8.8.8}"
 section "Docker"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-ask "Docker installeren? [j/N]:"
+ask "Docker installeren? [Y/N]:"
 read -rp "  → " INSTALL_DOCKER
 INSTALL_DOCKER="${INSTALL_DOCKER,,}"
 
@@ -91,8 +91,8 @@ echo "  Interface : $IFACE"
 echo "  Docker    : ${INSTALL_DOCKER:-n}"
 echo
 
-read -rp "Doorgaan? [j/N] " GO
-[[ "${GO,,}" == "j" ]] || die "Afgebroken."
+read -rp "Doorgaan? [Y/N] " GO
+[[ "${GO,,}" == "y" ]] || die "Afgebroken."
 
 # ═══════════════════════════════════════════════════════════════════════════════
 section "Hostname instellen"
@@ -128,7 +128,9 @@ $(echo "$DNS" | tr ',' '\n' | awk '{print "          - " $1}')
 EOF
 
 chmod 600 /etc/netplan/01-static.yaml
+ip link set "$IFACE" up
 netplan apply
+sleep 3
 log "Netwerk: ${IP}/${PREFIX} via ${GW}"
 
 # Wacht tot DNS beschikbaar is
@@ -242,7 +244,7 @@ log "NTP (chrony) actief"
 section "Docker"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if [[ "$INSTALL_DOCKER" == "j" ]]; then
+if [[ "$INSTALL_DOCKER" == "y" ]]; then
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
         | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -299,5 +301,5 @@ echo -e "${GREEN}${BOLD}  ✓ Setup voltooid${NC}"
 echo "  ${HOSTNAME,,} – ${IP}/${PREFIX}"
 echo
 
-read -rp "Herstarten? [j/N] " RB
-[[ "${RB,,}" == "j" ]] && reboot
+read -rp "Herstarten? [Y/N] " RB
+[[ "${RB,,}" == "y" ]] && reboot
