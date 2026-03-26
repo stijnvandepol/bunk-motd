@@ -124,113 +124,6 @@ netplan apply
 sleep 3
 log "Netwerk: ${IP}/${PREFIX} via ${GW}"
 
-# Wacht tot DNS beschikbaar is
-for i in {1..10}; do
-    if getent hosts archive.ubuntu.com &>/dev/null; then
-        break
-    fi
-    warn "Wacht op DNS... ($i/10)"
-    sleep 2
-done
-getent hosts archive.ubuntu.com &>/dev/null || die "DNS werkt niet — controleer nameservers en gateway."
-
-# ═══════════════════════════════════════════════════════════════════════════════
-section "Updates installeren"
-# ═══════════════════════════════════════════════════════════════════════════════
-
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get upgrade -y -qq
-apt-get install -y -qq \
-    curl wget git vim htop ufw fail2ban \
-    ca-certificates gnupg lsb-release \
-    unattended-upgrades chrony open-vm-tools
-log "Pakketten geïnstalleerd"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-section "Hardening"
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# sysctl
-cat > /etc/sysctl.d/99-bunk.conf <<'EOF'
-net.ipv4.ip_forward = 0
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.tcp_syncookies = 1
-net.ipv4.icmp_echo_ignore_broadcasts = 1
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.all.log_martians = 1
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-kernel.randomize_va_space = 2
-kernel.yama.ptrace_scope = 1
-kernel.dmesg_restrict = 1
-kernel.sysrq = 0
-fs.protected_hardlinks = 1
-fs.protected_symlinks = 1
-EOF
-sysctl --system -q
-log "sysctl hardening"
-
-# SSH
-cat > /etc/ssh/sshd_config <<'EOF'
-Port 22
-AddressFamily inet
-PermitRootLogin no
-PasswordAuthentication no
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-PermitEmptyPasswords no
-MaxAuthTries 3
-LoginGraceTime 30
-X11Forwarding no
-AllowAgentForwarding no
-AllowTcpForwarding no
-ClientAliveInterval 300
-ClientAliveCountMax 2
-UsePAM yes
-KexAlgorithms curve25519-sha256,diffie-hellman-group16-sha512
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes256-ctr
-MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com
-SyslogFacility AUTH
-LogLevel VERBOSE
-Subsystem sftp /usr/lib/openssh/sftp-server
-EOF
-systemctl restart ssh
-log "SSH gehard (alleen key-based)"
-
-# UFW
-ufw --force reset
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp comment 'SSH'
-ufw --force enable
-log "UFW: default deny, SSH open"
-
-# fail2ban
-cat > /etc/fail2ban/jail.d/bunk.conf <<'EOF'
-[sshd]
-enabled  = true
-maxretry = 3
-bantime  = 86400
-findtime = 600
-EOF
-systemctl enable fail2ban
-systemctl restart fail2ban
-log "fail2ban actief"
-
-# Automatische beveiligingsupdates
-cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-EOF
-log "Automatische updates ingeschakeld"
-
-# NTP
-systemctl enable chrony
-systemctl start chrony 2>/dev/null || true
-log "NTP (chrony) actief"
-
 # ═══════════════════════════════════════════════════════════════════════════════
 section "SSH public key"
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -248,8 +141,24 @@ fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 echo
-echo -e "${GREEN}${BOLD}  ✓ Setup voltooid${NC}"
+echo -e "${GREEN}${BOLD}  ✓ Basis-setup voltooid${NC}"
 echo "  ${HOSTNAME,,} – ${IP}/${PREFIX}"
+echo
+echo -e "${BOLD}${CYAN}── Handmatige stappen (TODO) ──${NC}"
+echo
+echo -e "  ${YELLOW}[ ]${NC} apt-get update && apt-get upgrade"
+echo -e "  ${YELLOW}[ ]${NC} Pakketten installeren: curl wget git vim htop ufw fail2ban"
+echo -e "      ca-certificates gnupg lsb-release unattended-upgrades chrony open-vm-tools"
+echo -e "  ${YELLOW}[ ]${NC} SSH hardening (/etc/ssh/sshd_config):"
+echo -e "      PermitRootLogin no, PasswordAuthentication no, MaxAuthTries 3"
+echo -e "  ${YELLOW}[ ]${NC} UFW configureren: default deny incoming, allow 22/tcp"
+echo -e "  ${YELLOW}[ ]${NC} fail2ban configureren voor SSH (maxretry 3, bantime 86400)"
+echo -e "  ${YELLOW}[ ]${NC} sysctl hardening (/etc/sysctl.d/99-bunk.conf):"
+echo -e "      disable ipv6, enable syncookies, rp_filter, log_martians"
+echo -e "  ${YELLOW}[ ]${NC} Automatische beveiligingsupdates (unattended-upgrades)"
+echo -e "  ${YELLOW}[ ]${NC} NTP instellen (chrony)"
+echo -e "  ${YELLOW}[ ]${NC} Docker installeren (indien nodig)"
+echo -e "  ${YELLOW}[ ]${NC} Herstart de machine"
 echo
 
 read -rp "Herstarten? [Y/N] " RB
