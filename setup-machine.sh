@@ -95,19 +95,6 @@ read -rp "Doorgaan? [j/N] " GO
 [[ "${GO,,}" == "j" ]] || die "Afgebroken."
 
 # ═══════════════════════════════════════════════════════════════════════════════
-section "Updates installeren"
-# ═══════════════════════════════════════════════════════════════════════════════
-
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get upgrade -y -qq
-apt-get install -y -qq \
-    curl wget git vim htop ufw fail2ban \
-    ca-certificates gnupg lsb-release \
-    unattended-upgrades chrony open-vm-tools
-log "Pakketten geïnstalleerd"
-
-# ═══════════════════════════════════════════════════════════════════════════════
 section "Hostname instellen"
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -143,6 +130,29 @@ EOF
 chmod 600 /etc/netplan/01-static.yaml
 netplan apply
 log "Netwerk: ${IP}/${PREFIX} via ${GW}"
+
+# Wacht tot DNS beschikbaar is
+for i in {1..10}; do
+    if getent hosts archive.ubuntu.com &>/dev/null; then
+        break
+    fi
+    warn "Wacht op DNS... ($i/10)"
+    sleep 2
+done
+getent hosts archive.ubuntu.com &>/dev/null || die "DNS werkt niet — controleer nameservers en gateway."
+
+# ═══════════════════════════════════════════════════════════════════════════════
+section "Updates installeren"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get upgrade -y -qq
+apt-get install -y -qq \
+    curl wget git vim htop ufw fail2ban \
+    ca-certificates gnupg lsb-release \
+    unattended-upgrades chrony open-vm-tools
+log "Pakketten geïnstalleerd"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 section "Hardening"
