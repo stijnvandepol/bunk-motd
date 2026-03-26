@@ -64,14 +64,6 @@ read -rp "  → " DNS
 DNS="${DNS:-1.1.1.1,8.8.8.8}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-section "Docker"
-# ═══════════════════════════════════════════════════════════════════════════════
-
-ask "Docker installeren? [Y/N]:"
-read -rp "  → " INSTALL_DOCKER
-INSTALL_DOCKER="${INSTALL_DOCKER,,}"
-
-# ═══════════════════════════════════════════════════════════════════════════════
 section "SSH public key"
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -88,7 +80,6 @@ echo "  IP        : ${IP}/${PREFIX}"
 echo "  Gateway   : $GW"
 echo "  DNS       : $DNS"
 echo "  Interface : $IFACE"
-echo "  Docker    : ${INSTALL_DOCKER:-n}"
 echo
 
 read -rp "Doorgaan? [Y/N] " GO
@@ -239,46 +230,6 @@ log "Automatische updates ingeschakeld"
 systemctl enable chrony
 systemctl start chrony 2>/dev/null || true
 log "NTP (chrony) actief"
-
-# ═══════════════════════════════════════════════════════════════════════════════
-section "Docker"
-# ═══════════════════════════════════════════════════════════════════════════════
-
-if [[ "$INSTALL_DOCKER" == "y" ]]; then
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-        > /etc/apt/sources.list.d/docker.list
-
-    apt-get update -qq
-    apt-get install -y -qq \
-        docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin
-
-    # Docker hardening
-    cat > /etc/docker/daemon.json <<'EOF'
-{
-  "log-driver": "json-file",
-  "log-opts": { "max-size": "50m", "max-file": "3" },
-  "no-new-privileges": true,
-  "icc": false,
-  "live-restore": true
-}
-EOF
-
-    systemctl enable docker
-    systemctl restart docker
-    usermod -aG docker ubuntu 2>/dev/null || true
-
-    log "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
-    log "Compose $(docker compose version | awk '{print $4}')"
-else
-    log "Docker overgeslagen"
-fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 section "SSH public key"
